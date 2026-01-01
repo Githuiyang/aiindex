@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, CheckCircle, AlertCircle, Loader2, Lock, Heart, Repeat, ExternalLink, User } from 'lucide-react';
-import { useAuthStore } from '../../store/useAuthStore';
+import { useAdminAuth } from '../../hooks/useAdminAuth';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -38,8 +38,9 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [adminAuthError, setAdminAuthError] = useState(false);
   const [previewTweet, setPreviewTweet] = useState<PreviewTweet | null>(null);
   const [previewError, setPreviewError] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
-  const { isAdmin, login, logout } = useAuthStore();
+  const { isAdmin, isLoading, login, logout } = useAdminAuth();
 
   const toChineseError = (raw: string) => {
     const msg = (raw || '').trim();
@@ -181,14 +182,29 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     onClose();
   };
 
-  const handleAdminLogin = () => {
-    if (adminPassword === 'aiindex2025') {
-      login();
-      setAdminPassword('');
-      setAdminAuthError(false);
-    } else {
+  const handleAdminLogin = async () => {
+    if (!adminPassword) {
       setAdminAuthError(true);
       setTimeout(() => setAdminAuthError(false), 2000);
+      return;
+    }
+
+    setIsLoggingIn(true);
+    try {
+      const success = await login(adminPassword);
+      if (success) {
+        setAdminPassword('');
+        setAdminAuthError(false);
+      } else {
+        setAdminAuthError(true);
+        setTimeout(() => setAdminAuthError(false), 2000);
+      }
+    } catch (error) {
+      console.error('Admin login error:', error);
+      setAdminAuthError(true);
+      setTimeout(() => setAdminAuthError(false), 2000);
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
@@ -260,9 +276,17 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     </div>
                     <button
                       onClick={handleAdminLogin}
-                      className="w-full py-3 bg-white text-black font-bold rounded-lg hover:bg-zinc-200 transition-colors"
+                      disabled={isLoggingIn || isLoading}
+                      className="w-full py-3 bg-white text-black font-bold rounded-lg hover:bg-zinc-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
-                      登录
+                      {isLoggingIn || isLoading ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          验证中...
+                        </>
+                      ) : (
+                        '登录'
+                      )}
                     </button>
                   </div>
                 )}
